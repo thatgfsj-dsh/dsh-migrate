@@ -60,7 +60,7 @@ dsh plugin --profile web add /path/to/dsh-migrate
 dsh plugin --profile web add ./dsh-migrate-0.1.1.tgz
 ```
 
-⚠️ 0.2.1-rc.2 实测：**tgz 安装会因为包内带技能而要求批准**（同一份包用本地目录安装则不会）：
+⚠️ 0.2.1-rc.2 实测：**tgz 安装会因为包内带技能而要求批准**（同一份包用本地目录安装则不会）。这条提示来自 **pnpm 12 的供应链策略**（不是 DSH 的插件审批；本机 pnpm 12.11.2 的 reporter 里就是这句文案），批准即在该 profile 目录执行 `pnpm approve`：
 
 ```text
 Agent skills awaiting approval: dsh-migrate@file:../../…/dsh-migrate-0.1.1.tgz.

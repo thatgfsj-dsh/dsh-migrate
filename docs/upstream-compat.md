@@ -44,6 +44,7 @@
 - **退休 bundle**：`@deepseek-ai/dsh-experimental-schedule-bundle` 在 `RETIRED_BUNDLES` 中，升级到含它的版本时会自动从 profile 的 `bundles` 列表移除（不报错）。
 - **`fs-observation-policy` 默认关闭**（0.2.2-alpha.2 起）：只影响 agent 写文件前是否必须先读，与搬运无关。
 - `reportSkippedBundles` 的 stderr 文案（`skipping profile bundle "<名字>": <原因>`）**未变** → 我们释放后自检的解析仍然有效。
+- **安装期审批来自 pnpm，不是 DSH**：`Agent skills awaiting approval: … Run "pnpm approve" to review them.` 是 pnpm 12（本机 12.11.2）`default-reporter` 的供应链策略文案，对 registry / git / tgz 解析出的包生效；本地目录 `link:` 不解析归档，所以不触发。文档里不要把这条描述成"DSH 插件审批"。
 
 ## 行动清单（按优先级）
 
@@ -52,7 +53,7 @@
 | P0 | 0.2.2 上加载插件 | **无阻塞**（静态调查结论，真机待验 #58） |
 | P1 | peer 范围补 `^0.2.2-rc.1`（DSH 门禁不要求，pnpm 安装告警需要） | 待办 #60 |
 | P1 | README / 技能补 0.2.2 与 Node ≥24.9 要求 | 待办 #57 |
-| P2 | 可选：给插件自己的 `settings.section` 加导航图标、HTTP 端点改用 `resource`、客户端图片走 `assets` 约定 | 不需要 |
+| P2 | 可选：给插件自己的 `settings.section` 加导航图标、HTTP 端点改用 `resource`、客户端图片走 `assets` 约定、用 `locale/<lang>.json` 的 `meta.detail`（指向 `docs/*.md`，支持 ≤5 MiB 预览图）在 Plugins 页展示正式详情 | 不需要 |
 
 ## 验证到什么程度
 
