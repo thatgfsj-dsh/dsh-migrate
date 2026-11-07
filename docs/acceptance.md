@@ -15,6 +15,8 @@
 - [ ] 升级路径（#46）：0.2.0 打的包在 0.2.1 runtime 上释放 → 重启后 `dsh --profile <p> --dump-config` 没有 `skipping profile bundle`；若有，释放报告里必须出现 ⚠️ 自检 与 `dsh plugin --profile <p> install` 建议
 - [ ] 故意释放到一个非空 home → 生成 `<home>.bak-<时间>`，备份里有旧文件
 - [ ] 在 zip 里塞一个假 `sk-` 字符串后重打包 → **必须中止**，且报告里是打码值
+- [ ] 目标机 `node -v` 满足版本要求（0.2.2+ 需 ≥ 24.9）；否则先升 Node 再装 dsh
+- [ ] 0.2.2-rc.1（当前 latest）上走一遍：装插件 → `--dump-config` 出现层 → 打包/释放各一次；结果贴回 #58
 
 ## 浏览器（Web UI 半边）
 
