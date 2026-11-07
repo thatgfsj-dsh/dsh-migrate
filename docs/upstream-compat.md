@@ -6,12 +6,12 @@
 
 ## 版本总览
 
-| DSH 版本 | 本机真机验证 | cordis | schemastery | `engines.node` | 结论 |
+| DSH 版本 | 真机验证 | cordis | schemastery | `engines.node` | 结论 |
 |---|---|---|---|---|---|
-| `0.2.0-rc.2` | ✅ 是 | 4.0.4 | 3.18.4 | 未声明（包内 action 实际可用 22.19+） | 可用 |
-| `0.2.1-rc.2` | ✅ 是 | 4.0.5 | 3.18.5 | 同上 | 可用；`ci / compat-next` 长期跑 |
+| `0.2.0-rc.2` | ✅ 本机 | 4.0.4 | 3.18.4 | 未声明（包内 action 实际可用 22.19+） | 可用 |
+| `0.2.1-rc.2` | ✅ 本机 | 4.0.5 | 3.18.5 | 同上 | 可用；`ci / compat-next` 长期跑 |
 | `0.2.1-rc.3 … rc.5` | — | 4.0.5 | 3.18.5 | 同上 | 静态调查：与 rc.2 同一插件契约 |
-| `0.2.2-rc.1`（当前 `latest`） | ❌ 否 | **4.1.0** | **3.19.0** | **`>=24.9.0`** | 静态调查：**无需改代码即可加载**；见下方行动 |
+| `0.2.2-rc.1`（当前 `latest`） | ✅ **CI 自动化**（2026-11-08） | **4.1.0** | **3.19.0** | **`>=24.9.0`** | 静态调查 + `ci / compat-next` 实跑通过：`dsh next = 0.2.2-rc.1`、集成测试 1/1、组合层与 `/api/dsh-migrate/state`（version 与 package.json 一致）均 OK；但**人工/浏览器**未验证 |
 
 > `0.2.2-rc.1` 发布于 2026-11-04。npm dist-tags 当时为 `latest = 0.2.2-rc.1`、`next = 0.2.2-rc.1`、`alpha = 0.2.2-alpha.3`。
 
@@ -54,11 +54,15 @@
 | P1 | README / 技能补 0.2.2 与 Node ≥24.9 要求 | 待办 #57 |
 | P2 | 可选：给插件自己的 `settings.section` 加导航图标、HTTP 端点改用 `resource`、客户端图片走 `assets` 约定 | 不需要 |
 
-## 未真机验证项
+## 验证到什么程度
 
-- 0.2.2-rc.1 上插件能否正常挂载、按钮是否渲染（本轮按要求只调查官方仓库）
+- **已由 CI 自动化验证（0.2.2-rc.1，run 42403338691 的 `ci / compat-next`）**：安装 `@deepseek-ai/dsh@next` → 集成测试 `# pass 1 / # fail 0` → 建 web profile 装本插件 → layer 断言 → 起服务 → `/api/dsh-migrate/state` 返回 `ok:true` 且 version 与 package.json 一致 → `== compat ok: @deepseek-ai/dsh@next (0.2.2-rc.1)`。
+
+## 未验证项（人工/浏览器）
+
+- 0.2.2-rc.1 上按钮在浏览器里的实际渲染（Web UI 客户端半边，需人工点一次）
 - 插件页开关在 0.2.2 上的持久化位置
-- 0.2.2 上 `dsh plugin add <本地目录/tgz>` 的 pnpm peer 警告实际文案
+- 0.2.2 上 `dsh plugin add <本地目录/tgz>` 的 pnpm peer 警告实际文案（CI 走的是本地目录安装，日志未见拒绝）
 
 ## 复现调查的方法
 
