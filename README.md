@@ -25,7 +25,7 @@
   4. 把这个 zip 拷到新电脑（U 盘 / 网盘 / 微信都行）
 
 设备 2（新机）
-  5. 装 Node（22.19+ 或 24+）
+  5. 装 Node（**0.2.2 起要求 ≥ 24.9**；0.2.0 / 0.2.1 用 22.19+ 或 24+）
   6. npm i -g @deepseek-ai/dsh@<zip 里 manifest.json 的 source.dsh 版本>
   7. 安装本插件
   8. 点【释放大肥鱼】→ 选那个 zip → 等进度走完
@@ -126,7 +126,9 @@ Run "pnpm approve" to review them.
 
 Linux / Windows / macOS 三平台都在 CI 里跑（矩阵 `ubuntu-latest`、`windows-latest`、`macos-latest` × node 24，另加 node 22）。跨平台细节：Windows 长路径与反斜杠、macOS 的 `__MACOSX`/`ditto`、Linux 无 zenity/kdialog 时的兜底，都在代码与用例里覆盖。
 
-支持的 DSH 版本：`0.2.0-rc.2`（latest）与 `0.2.1-rc.2`（next）；CI 的 `compat-next` job 会跟随 next 通道实机复验。
+支持的 DSH 版本：`0.2.0-rc.2` 与 `0.2.1-rc.2`（本机真机验证过）；`0.2.1-rc.3 … rc.5` 与 `0.2.2-rc.1`（当前 `latest`）为**静态调查**结论——插件契约未变、无需改代码，但尚未真机跑过。CI 的 `compat-next` job 会跟随 `@next` 通道实机复验。
+
+跨版本迁移注意：新机优先装归档 `manifest.json` 里记录的 DSH 版本；装更高版本时注意 `0.2.2+` 要求 **Node ≥ 24.9**。调查证据与待验证项见 [docs/upstream-compat.md](docs/upstream-compat.md)。
 
 **人工验收清单**（需要真机 + 浏览器）见 [docs/acceptance.md](docs/acceptance.md)。
 
