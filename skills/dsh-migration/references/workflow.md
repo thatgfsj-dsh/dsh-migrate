@@ -29,6 +29,14 @@ fatfish_release
   dryRun?      默认 true —— 只演练
 ```
 
+动手前先查目标机 Node——`0.2.2+` 的 dsh 要求 **Node ≥ 24.9**（来源：`apps/cli/package.json@dsh-v0.2.2-rc.1` 的 `engines.node`），`0.2.0` / `0.2.1` 用 22.19+ 或 24+：
+
+```sh
+node -v
+```
+
+低于 `manifest.json` 里 `source.dsh` 对应的要求就先升 Node 再装 dsh（`npm i -g @deepseek-ai/dsh@<source.dsh>`）。释放报告也会按目标 DSH 版本再核一次 Node（`lib/core/verify.mjs` 的 `nodeRequirementFor()`），低于下限给「Node 版本过低」warning——但装 DSH 之前就该过这一步。
+
 内部流水线（`lib/core/release.mjs`）：
 
 1. **verify** — 同上；不通过抛 `VERIFY_FAILED`
@@ -56,6 +64,7 @@ Windows 用 `dsh-migrate-tools\restore.cmd --yes`。它只用 Node 标准库，�
 - `backupPath`：旧环境去哪了；要退回就把新 home 删掉、备份改回原名
 - `residuals`：残留的旧路径（>0 说明有文件没重写成功，通常需要重建插件依赖）
 - `bootstrap`：自举安装结果；失败不影响释放，按给出的命令手动执行即可
+- `warnings` 里的「Node 版本过低」：目标机 Node 低于目标 DSH 版本的下限（如 `0.2.2+` 需 ≥ 24.9），先升 Node 再装/跑 dsh
 - `postInstall`：释放后自检，**只读、不会写目标 home**。`checked:true` 且无 warning = 目标 profile 的 bundle 全部解析正常；有 `skippedBundles` / `missingPatches` 时按报告的 `dsh plugin --profile <p> install` 处理。只检查已存在的 profile（`profiles/<p>/package.json`）；目标 home 没有 profile、profile 无法确定或 dsh 不可用时直接 `checked:false` + warning 跳过——**绝不为了诊断创建 profile**（`dsh --profile X --dump-config` 在 0.2.0/0.2.1 都会初始化缺失的 X，那会造假并破坏后续自举的 profile 发现）
 
 ## 升级 DSH / 换到新机之后

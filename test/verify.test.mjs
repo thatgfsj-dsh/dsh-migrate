@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 
 import { pack } from '../lib/core/pack.mjs'
-import { readManifest, VerifyError, verifyArchive } from '../lib/core/verify.mjs'
+import { nodeRequirementFor, readManifest, runtimeReport, VerifyError, verifyArchive } from '../lib/core/verify.mjs'
 import { ZipWriter, extractZip, listZip } from '../lib/core/zip.mjs'
 
 let root
@@ -136,4 +136,42 @@ test('runtime drift is reported as warning or info', async () => {
   assert.ok(report.warnings.some((warning) => warning.includes('DSH 版本不同')))
   assert.ok(report.warnings.some((warning) => warning.includes('Node 主版本不同')))
   assert.ok(report.info.some((entry) => entry.includes('pnpm 版本不同')))
+})
+
+test('the Node floor follows the target DSH version (#57)', () => {
+  assert.equal(nodeRequirementFor('0.2.2-rc.1').minimum, '24.9.0')
+  assert.equal(nodeRequirementFor('0.2.1-rc.2').minimum, '22.19.0')
+  assert.equal(nodeRequirementFor('0.2.0-rc.2').minimum, '22.19.0')
+  assert.equal(nodeRequirementFor('0.3.0').minimum, '24.9.0', 'an unknown newer line keeps the newest known floor')
+  assert.equal(nodeRequirementFor('not-a-version'), undefined)
+
+  const at = (dsh, node) => runtimeReport({ source: { dsh } }, { node })
+
+  // The bug this fixes: 24.8 vs 24.9 share a major version, so a major-only
+  // comparison stayed silent.
+  assert.ok(at('0.2.2-rc.1', '24.8.0').warnings.some((warning) => warning.includes('Node 版本过低') && warning.includes('24.9.0')))
+  assert.deepEqual(at('0.2.2-rc.1', '24.9.0').warnings, [])
+  assert.deepEqual(at('0.2.2-rc.1', '25.0.0').warnings, [])
+  assert.ok(at('0.2.1-rc.2', '22.18.9').warnings.some((warning) => warning.includes('Node 版本过低')))
+  assert.deepEqual(at('0.2.1-rc.2', '22.19.0').warnings, [])
+  // `node -v` prints a v prefix; that must not defeat the check.
+  assert.deepEqual(at('0.2.2-rc.1', 'v24.9.0').warnings, [])
+
+  // A detected local dsh decides the floor; the archive only supplies the
+  // fallback when the target machine has no dsh yet.
+  const localWins = runtimeReport({ source: { dsh: '0.2.1-rc.2' } }, { dsh: '0.2.2-rc.1', node: '24.8.0' })
+  assert.ok(localWins.warnings.some((warning) => warning.includes('Node 版本过低')))
+
+  // Without any target dsh version there is no floor to enforce.
+  assert.deepEqual(runtimeReport({ source: {} }, { node: '18.0.0' }).warnings, [])
+})
+
+test('verifyArchive checks Node against the target DSH version', async () => {
+  const zipPath = await repack(await packFixture('node-floor'), 'node-floor', {
+    mutate: (manifest) => { manifest.source.dsh = '0.2.2-rc.1' },
+  })
+  const tooOld = await verifyArchive(zipPath, { hash: false, local: { node: '24.8.0' } })
+  assert.ok(tooOld.warnings.some((warning) => warning.includes('Node 版本过低')))
+  const fine = await verifyArchive(zipPath, { hash: false, local: { node: '24.9.0' } })
+  assert.ok(!fine.warnings.some((warning) => warning.includes('Node 版本过低')))
 })

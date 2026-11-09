@@ -10,7 +10,7 @@
 | 释放后插件行没生效 | 插件依赖需要重建；或平台绑定项被跳过 | 按报告里的自举命令执行 `dsh plugin --profile <p> add <home>/plugins/dsh-migrate`；或重装平台对应的插件包 |
 | `residuals` 不为 0 | 有文件里的旧路径没被重写（二进制/超限/非文本） | 检查报告列出的文件；必要时手工改或用同平台重打包 |
 | 目标机 DSH 版本与归档不同 | `manifest.source.dsh` 与本地不一致 | 优先装同版本（`npm i -g @deepseek-ai/dsh@<manifest 里的版本>`）；装更高版本时接受差异并注意下一条 |
-| 目标机 Node 版本过低 | `0.2.2+` 的 dsh 要求 **Node ≥ 24.9**（`apps/cli` 的 `engines.node`）；0.2.0/0.2.1 用 22.19+ 或 24+ | 先 `node -v`；低于要求就升 Node 再装 dsh。跨版本细节见仓库 `docs/upstream-compat.md` |
+| 目标机 Node 版本过低 | 目标 DSH 版本要求的 Node 下限：`0.2.2+` 是 **Node ≥ 24.9**（`apps/cli/package.json@dsh-v0.2.2-rc.1` 的 `engines.node`）；0.2.0/0.2.1 用 22.19+ 或 24+ | 先 `node -v`；低于要求就升 Node 再装 dsh。释放报告会按目标 DSH 版本给「Node 版本过低」warning（24.8 对 24.9 也会报，不再只看主版本）。跨版本细节见仓库 `docs/upstream-compat.md` |
 | 归档里少了语音模型 | 模型缓存默认不带 | 重打包时用 `includeModels: true` |
 | 弹不出"选择保存位置" | headless / 无 zenity/kdialog / 无 DISPLAY | 工具会自动回退到默认目录并在报告里说明；也可显式传 `savePath` |
 | 想撤销释放 | 默认会整体备份 | 删掉新 home，把 `<home>.bak-<时间>` 改回 `<home>` |

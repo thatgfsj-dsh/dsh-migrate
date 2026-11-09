@@ -126,9 +126,9 @@ Run "pnpm approve" to review them.
 
 Linux / Windows / macOS 三平台都在 CI 里跑（矩阵 `ubuntu-latest`、`windows-latest`、`macos-latest` × node 24，另加 node 22）。跨平台细节：Windows 长路径与反斜杠、macOS 的 `__MACOSX`/`ditto`、Linux 无 zenity/kdialog 时的兜底，都在代码与用例里覆盖。
 
-支持的 DSH 版本：`0.2.0-rc.2` 与 `0.2.1-rc.2`（本机真机验证过）；`0.2.1-rc.3 … rc.5` 与 `0.2.2-rc.1`（当前 `latest`）为**静态调查 + CI 自动化实跑**结论——插件契约未变、无需改代码，`ci / compat-next` 已在 0.2.2-rc.1 上跑通（组合层 + 端点）；人工/浏览器验收仍待做。CI 的 `compat-next` job 会跟随 `@next` 通道持续复验。
+支持的 DSH 版本：`0.2.0-rc.2`、`0.2.1-rc.2` 与 `0.2.2-rc.1`（当前 `latest`）。前两条本机真机验证过；`0.2.1-rc.3 … rc.5` 与 `0.2.2-rc.1` 为**静态调查 + CI 自动化实跑**结论——插件契约未变，`ci / compat-next` 已在 0.2.2-rc.1 上跑通（组合层 + 端点）；人工/浏览器验收仍待做。插件的 peer 范围显式覆盖这三条 rc 线（`@deepseek-ai/dsh-tools: ^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1`），CI 的 `compat-next` job 会跟随 `@next` 通道持续复验。
 
-跨版本迁移注意：新机优先装归档 `manifest.json` 里记录的 DSH 版本；装更高版本时注意 `0.2.2+` 要求 **Node ≥ 24.9**。调查证据与待验证项见 [docs/upstream-compat.md](docs/upstream-compat.md)。
+跨版本迁移注意：新机优先装归档 `manifest.json` 里记录的 DSH 版本；装更高版本时注意 Node 要求——`0.2.2+` 需 **Node ≥ 24.9**（来源：`apps/cli/package.json@dsh-v0.2.2-rc.1` 的 `engines.node = ">=24.9.0"`），`0.2.0` / `0.2.1` 用 22.19+ 或 24+（上游这两条线未声明 `engines.node`）。释放报告会按目标 DSH 版本检查目标机 Node，低于下限直接给 warning。调查证据与待验证项见 [docs/upstream-compat.md](docs/upstream-compat.md)。
 
 **人工验收清单**（需要真机 + 浏览器）见 [docs/acceptance.md](docs/acceptance.md)。
 
