@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
@@ -212,6 +212,18 @@ test('native tools accept the archive (unzip / tar / Expand-Archive)', async (t)
       assert.match(tar.output, /payload\/hello\.txt/)
       checks.push('tar -tf')
     }
+    if (process.platform === 'darwin') {
+      // Finder-style extraction on macOS goes through `ditto`, which must see the
+      // same structure and must not invent a `__MACOSX` sibling.
+      const extracted = join(work, 'out-ditto')
+      const ditto = tryExec('ditto', ['-x', '-k', zipPath, extracted])
+      if (ditto.ok) {
+        assert.equal(sha256(join(extracted, 'payload', 'hello.txt')), sha256(join(source, 'hello.txt')))
+        assert.equal(sha256(join(extracted, 'payload', '中文 目录', '文件 名.txt')), sha256(join(source, '中文 目录', '文件 名.txt')))
+        assert.deepEqual(await readdir(extracted), ['payload'], 'ditto must not add __MACOSX to a well-formed archive')
+        checks.push('ditto -x -k')
+      }
+    }
   }
 
   if (checks.length === 0) return t.skip('no native zip tool available on this host')
@@ -234,4 +246,54 @@ test('many small entries stay consistent (central directory parsing)', async () 
   await extractZip(zipPath, dest)
   const names = await readdir(join(dest, 'payload'))
   assert.equal(names.length, 300)
+})
+
+test('symlink entries are materialized when the OS refuses to create links (#18)', async () => {
+  // Crafting the entry directly (instead of symlinking on disk) keeps this test
+  // meaningful on Windows without Developer Mode, where the extractor must fall
+  // back to copying the link target.
+  const zipPath = join(work, 'link-materialize.zip')
+  const zip = await ZipWriter.create(zipPath)
+  await zip.add({ name: 'payload/target.txt', type: 'file', content: '链接 内容\n' })
+  await zip.add({ name: 'payload/link.txt', type: 'symlink', content: 'target.txt' })
+  await zip.close()
+
+  const dest = join(work, 'out-link-materialize')
+  await extractZip(zipPath, dest)
+  assert.equal(await readFile(join(dest, 'payload', 'target.txt'), 'utf8'), '链接 内容\n')
+  // POSIX/macOS keeps a real symlink; Windows without the privilege copies the
+  // target. Either way the payload must be readable through the link name.
+  assert.equal(await readFile(join(dest, 'payload', 'link.txt'), 'utf8'), '链接 内容\n')
+})
+
+test('a path longer than 260 characters round trips (#18)', async (t) => {
+  const segments = Array.from({ length: 24 }, (_, index) => `long-segment-${String(index).padStart(2, '0')}`)
+  const entryName = ['payload', ...segments, 'leaf 中文.txt'].join('/')
+  assert.ok(entryName.length > 260, `fixture must exceed MAX_PATH, got ${entryName.length}`)
+
+  const zipPath = join(work, 'long-path.zip')
+  const zip = await ZipWriter.create(zipPath)
+  await zip.add({ name: entryName, type: 'file', content: '长路径载荷\n' })
+  await zip.close()
+
+  // Long names must survive listing and verification on every platform.
+  const { entries } = await listZip(zipPath)
+  assert.deepEqual(entries.map((entry) => entry.name), [entryName])
+  assert.equal((await verifyZip(zipPath)).ok, true)
+
+  const dest = join(work, 'out-long-path')
+  const target = join(dest, 'payload', ...segments, 'leaf 中文.txt')
+  assert.ok(target.length > 260, `target path must exceed MAX_PATH, got ${target.length}`)
+  try {
+    await extractZip(zipPath, dest)
+  } catch (error) {
+    // Windows only allows >260 paths when LongPathsEnabled is on (ci.yml enables
+    // it) or the caller uses the \\?\ prefix. If this host cannot create the
+    // fixture at all, the limitation is the host's, not the extractor's.
+    if (process.platform === 'win32' && ['ENAMETOOLONG', 'ENOENT', 'EINVAL'].includes(error.code)) {
+      return t.skip(`host cannot create >260 char paths (${error.code}); needs LongPathsEnabled or a real machine check`)
+    }
+    throw error
+  }
+  assert.equal(await readFile(target, 'utf8'), '长路径载荷\n')
 })

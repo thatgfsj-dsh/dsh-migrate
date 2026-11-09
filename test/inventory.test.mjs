@@ -84,6 +84,10 @@ test('classify: policy matrix', () => {
     ['.manual-backup-1/x', 'exclude', 'backup'],
     ['.DS_Store', 'exclude', 'junk'],
     ['plugins/a/.DS_Store', 'exclude', 'junk'],
+    ['__MACOSX/._AGENTS.md', 'exclude', 'junk'],
+    ['plugins/a/__MACOSX/._entry.js', 'exclude', 'junk'],
+    ['Thumbs.db', 'exclude', 'junk'],
+    ['plugins/a/desktop.ini', 'exclude', 'junk'],
     ['speech-to-text/x', 'optional', CATEGORY.optional],
   ]
   for (const [path, action, category] of cases) {
@@ -174,4 +178,35 @@ test('scanHome: includeModels pulls the model cache in', async () => {
   const scan = await scanHome(home, { includeModels: true })
   assert.ok(scan.entries.some((entry) => entry.path.startsWith('speech-to-text/')))
   assert.equal(scan.optional.length, 0)
+})
+
+test('scanHome: Finder / Explorer junk never reaches an archive (#19)', async () => {
+  const junkHome = await mkdtemp(join(tmpdir(), 'dsh-migrate-junk-'))
+  try {
+    const write = async (relative, content) => {
+      const absolute = join(junkHome, relative)
+      await mkdir(join(absolute, '..'), { recursive: true })
+      await writeFile(absolute, content)
+    }
+    await write('AGENTS.md', '# keep\n')
+    await write('plugins/dsh-demo/entry.js', 'export function apply() {}\n')
+    await write('__MACOSX/._AGENTS.md', 'appledouble')
+    await write('plugins/dsh-demo/__MACOSX/._entry.js', 'appledouble')
+    await write('plugins/dsh-demo/.DS_Store', 'finder metadata')
+    await write('plugins/dsh-demo/Thumbs.db', 'explorer cache')
+    await write('plugins/dsh-demo/desktop.ini', 'explorer metadata')
+
+    const scan = await scanHome(junkHome, { sourcePlatform: 'darwin-arm64' })
+    assert.deepEqual(scan.entries.map((entry) => entry.path).sort(), ['AGENTS.md', 'plugins/dsh-demo/entry.js'])
+    const excludedPaths = scan.excluded.map((entry) => entry.path)
+    for (const junk of [
+      '__MACOSX', 'plugins/dsh-demo/__MACOSX',
+      'plugins/dsh-demo/.DS_Store', 'plugins/dsh-demo/Thumbs.db', 'plugins/dsh-demo/desktop.ini',
+    ]) {
+      assert.ok(excludedPaths.includes(junk), `must be reported as excluded: ${junk}`)
+    }
+    assert.ok(scan.excluded.filter((entry) => entry.category === 'junk').length >= 5)
+  } finally {
+    await rm(junkHome, { recursive: true, force: true })
+  }
 })
