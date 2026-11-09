@@ -7,8 +7,17 @@
 1. **开议题**：描述背景、交付物、验收标准、依赖。平台相关改动用 `platform-verify` 模板。
 2. **开分支**：`<type>/<issue#>-<slug>`，例如 `feat/5-zip-engine`、`ci/2-matrix`。
 3. **提 PR**：标题用 Conventional Commits，正文写 `Closes #N`（或 `Refs #N`），并填写 PR 模板。
-4. **等 CI**：`ci / linux`、`ci / windows`、`ci / macos` 三个检查必须全绿。**每次合并前都必须跑 CI**，不允许跳过。
-5. **合并**：squash merge 到 `main`，分支保护会拦住未过检查的合并。
+4. **本地自查（PR 阶段不跑 CI）**：`node --test "test/**/*.test.mjs"` 全绿、`npm pack --dry-run` 通过；改动涉及平台行为或真机语义时，在 PR 正文里写清构建阶段要验证什么。
+5. **合并**：squash merge 到 `main`，合并后删除分支。分支保护保留线性历史、禁止强推与直接推送，但**不再要求 PR 阶段的状态检查**。
+6. **构建/发布阶段跑 CI**：合并到 `main` 自动触发三平台冒烟（`ci.yml`）；需要全矩阵/兼容性通道时在 Actions 里手动 `workflow_dispatch`；发布 tag 触发 `release.yml`。CI 红灯用后续 PR 修，不阻塞合并。
+
+> 为什么不在 PR 跑 CI：三平台矩阵 + `compat-next` 每个 PR 要占用数分钟，与「构建阶段集中验证」的规约冲突。PR 阶段靠本地自查与同侪审查，风险由构建阶段的矩阵兜底。
+
+## 分支与产物清理
+
+- 合并后用 `gh pr merge --delete-branch` 或 `git push origin --delete <branch>` 删除远端分支，并 `git branch -d <branch>` 清理本地分支。
+- 本机构建产物（`dist/`、`*.tgz`、测试用 `*.zip`）与临时 `DSH_HOME` 目录用完即删，不留在仓库与 home 里。
+- 长期不用的 worktree 用 `git worktree remove` 清理。
 
 ## 提交信息
 
