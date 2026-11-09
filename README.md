@@ -167,7 +167,7 @@ skills/dsh-migration/  随插件分发的技能
 
 ## 协作约定
 
-所有改动走 **议题 → 分支 → PR → CI 三平台全绿 → squash 合并**；`main` 有分支保护，必需检查 `ci / linux`、`ci / windows`、`ci / macos`。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+所有改动走 **议题 → 分支 → PR → squash 合并**。PR 阶段只做本地自查（`node --test`、`npm pack --dry-run`），**不跑 CI**；合并到 `main` 后自动跑三平台冒烟，构建/发布阶段再跑三平台全矩阵与 release 工作流。`main` 保留线性历史、禁止强推与直接推送。合并后删除分支，本机 `dist/` 与临时 `DSH_HOME` 及时清理。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## License
 

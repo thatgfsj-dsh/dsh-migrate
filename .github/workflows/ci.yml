@@ -1,9 +1,12 @@
 name: ci
 
+# CI runs after merge (`push: main`) and at the build/release stage
+# (`workflow_dispatch`). Pull requests do NOT trigger it — the project rule is
+# "run CI when building, not on every PR". PRs are gated by the local checks in
+# CONTRIBUTING.md; a red `push: main` run is fixed by a follow-up PR.
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
