@@ -15,12 +15,35 @@
 
 > `0.2.2-rc.1` 发布于 2026-11-04。npm dist-tags 当时为 `latest = 0.2.2-rc.1`、`next = 0.2.2-rc.1`、`alpha = 0.2.2-alpha.3`。
 
+当前插件 `peerDependencies`（#60 之后）显式列出三条 rc 线：`@deepseek-ai/dsh-tools: ^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1`。上游门禁本来就会用 `includePrerelease` 放行 0.2.2-rc.1，补这一条是为了消除 pnpm/npm 的 unmet peer 警告；为什么不用 `engines.dsh` 合并声明见下文[评估](#enginesdsh-单一声明评估60结论不采用)。
+
+## Node.js 版本要求（#57）
+
+| 目标 DSH 版本 | Node 要求 | 来源 |
+|---|---|---|
+| `0.2.2-rc.1`（当前 `latest`） | **`>=24.9.0`** | `apps/cli/package.json@dsh-v0.2.2-rc.1` 的 `engines.node`；`npm view @deepseek-ai/dsh@0.2.2-rc.1 engines` 同值 |
+| `0.2.0-rc.2` / `0.2.1-rc.2` | `^22.19.0 || >=24.0.0`（本包 `engines.node`；上游这两条线未声明 `engines.node`） | `npm view @deepseek-ai/dsh@0.2.1-rc.2 engines` 为空；22.19+ 是包内 action 实际可用的下限 |
+
+释放报告里的 Node 检查（`lib/core/verify.mjs` 的 `nodeRequirementFor()` / `runtimeReport()`）按**目标 DSH 版本**取上表下限，低于下限给 warning——`24.8.0` 对 `>=24.9.0` 会报，不再只看主版本。目标 DSH 版本取「本机检测到的 dsh，否则归档 `manifest.source.dsh`」。README 的「支持的 DSH 版本」段与随包技能（`references/workflow.md`、`references/troubleshooting.md`）给出同一套要求与 `node -v` 自查。
+
+## `engines.dsh` 单一声明评估（#60，结论：不采用）
+
+上游 `packages/boot/app-boot/src/plugin-compatibility.ts`（0.2.2-rc.1）的判定顺序是：插件自己有 `engines.dsh` 时**只**看它（`peerDependencies` 被忽略）；没有才回退到 `@deepseek-ai/dsh` / `@deepseek-ai/dsh-*` peers，且用 `semver.satisfies(runtime, range, { includePrerelease: true })`。
+
+不采用的理由：
+
+1. **省不掉每版改范围**：pnpm 的 peer 解析**不带** `includePrerelease`，prerelease 只认同一 `M.m.p` 元组上的 comparator，所以 peer 仍必须逐条列出每个 rc 线（#47 约定）。`engines.dsh` 只能替掉「上游门禁」这一份，而门禁本来就会随 `includePrerelease` 自动接受同一 0.2.x 线上的新 rc（现有 `^0.2.2-rc.1` 在门禁眼里已覆盖 `0.2.3-rc.1` 这类未来 rc），并没有卡住我们。
+2. **反而引入两份真相**：peer 要保留给 pnpm，就变成 peer + `engines.dsh` 两处声明，还得加测试保证一致；一旦不一致，门禁会静默改用 `engines.dsh` 而忽略 peer，故障面更大。
+3. **上游官方包也没用**：本机 `@deepseek-ai/dsh@0.2.2-rc.1` 安装树里所有 `@deepseek-ai/dsh-*` 包都只有 peers 声明，`engines.dsh` 实测 0 命中。这是门禁的逃生舱，不是发布约定。
+
+结论：保持 `peerDependencies` 为唯一声明，由 `test/peer-ranges.test.mjs` 守着「每条 rc 线必须显式列出 + `0.3.0` 必须拒绝」。若将来 pnpm 的 peer 解析支持 `includePrerelease`，或我们决定改走 `engines.dsh`，再按 #60 的备选方案同时保留 peer 并加测试校验两者一致。
+
 ## 对插件的影响面（0.2.1-rc.2 → 0.2.2-rc.1 静态调查）
 
 | 影响面 | 结论 | 要改代码？ |
 |---|---|---|
 | 包清单 `dsh.bundle` / `dsh.client` / `icon` / `exports` | 兼容；仅新增可选字段（见下） | 否 |
-| 兼容性门禁 `packages/boot/app-boot/src/plugin-compatibility.ts` | **逐字未变**；判定用 `semver.satisfies(runtime, range, { includePrerelease: true })`，现有 peer 范围在 0.2.2-rc.1 仍通过 | 否（建议补 0.2.2 线消除 pnpm 警告，见 #60） |
+| 兼容性门禁 `packages/boot/app-boot/src/plugin-compatibility.ts` | **逐字未变**；判定用 `semver.satisfies(runtime, range, { includePrerelease: true })`，现有 peer 范围在 0.2.2-rc.1 仍通过（#60 已显式补上 0.2.2 rc 线以消除 pnpm 警告） | 否 |
 | `defineTool` / `ctx.tools.register` / `ctx.skills.register` | 契约不变 | 否 |
 | `ctx.inject(['webServer'])` + `webServer.register({ kind:'exact', path, handler })` | handler 未废弃；新增可选 `resource: (Request, peer?) => Promise<Response>` | 否 |
 | 客户端 slot `settings.plugins.tab` | 仍在；options 仍为 `id` / `order` / `label` | 否 |
@@ -51,8 +74,9 @@
 | 优先级 | 事项 | 状态 |
 |---|---|---|
 | P0 | 0.2.2 上加载插件 | **无阻塞**（静态调查结论，真机待验 #58） |
-| P1 | peer 范围补 `^0.2.2-rc.1`（DSH 门禁不要求，pnpm 安装告警需要） | 待办 #60 |
-| P1 | README / 技能补 0.2.2 与 Node ≥24.9 要求 | 待办 #57 |
+| P1 | peer 范围补 `^0.2.2-rc.1`（DSH 门禁不要求，pnpm 安装告警需要） | **已完成 #60**：`^0.2.0-rc.2 \|\| ^0.2.1-rc.2 \|\| ^0.2.2-rc.1`，`test/peer-ranges.test.mjs` 覆盖 0.2.2-rc.1 且拒绝 0.3.0 |
+| P1 | README / 技能补 0.2.2 与 Node ≥24.9 要求 | **已完成 #57**：README 版本段、`references/workflow.md`/`troubleshooting.md` 的 `node -v` 自查、释放报告按目标 DSH 版本给 Node 下限 warning |
+| — | 评估 `engines.dsh` 单一声明 | **已评估，不采用**（理由见上文「`engines.dsh` 单一声明评估」） |
 | P2 | 可选：给插件自己的 `settings.section` 加导航图标、HTTP 端点改用 `resource`、客户端图片走 `assets` 约定、用 `locale/<lang>.json` 的 `meta.detail`（指向 `docs/*.md`，支持 ≤5 MiB 预览图）在 Plugins 页展示正式详情 | 不需要 |
 
 ## 验证到什么程度
@@ -63,7 +87,8 @@
 
 - 0.2.2-rc.1 上按钮在浏览器里的实际渲染（Web UI 客户端半边，需人工点一次）
 - 插件页开关在 0.2.2 上的持久化位置
-- 0.2.2 上 `dsh plugin add <本地目录/tgz>` 的 pnpm peer 警告实际文案（CI 走的是本地目录安装，日志未见拒绝）
+- 0.2.2 上 `dsh plugin add <本地目录/tgz>` 的 pnpm peer 警告实际文案（CI 走的是本地目录安装，日志未见拒绝；#60 补范围后需真机确认 tgz 安装不再报 unmet peer）
+- 目标机 Node 24.8 上跑一次释放，确认报告出现「Node 版本过低」warning（#57 的代码用例已单测覆盖，真机文案待确认）
 
 ## 复现调查的方法
 

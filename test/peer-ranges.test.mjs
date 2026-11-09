@@ -159,19 +159,25 @@ function satisfies(versionText, rangeText) {
 
 const DSH_PREFIX = '@deepseek-ai/dsh-'
 
-/** Runtime versions a released dsh line installs; every one must be covered. */
-const SUPPORTED_DSH_VERSIONS = ['0.2.0-rc.2', '0.2.1-rc.2']
+/**
+ * Runtime versions a released dsh line installs; every one must be covered.
+ * node-semver only matches a prerelease when the comparator set carries a
+ * prerelease on the *same* M.m.p tuple, so each new rc line must be named
+ * explicitly — 0.2.2-rc.1 is the current `latest` (#60).
+ */
+const SUPPORTED_DSH_VERSIONS = ['0.2.0-rc.2', '0.2.1-rc.2', '0.2.2-rc.1']
 
 /** The next breaking line; a peer range must never claim it. */
-const REJECTED_DSH_VERSIONS = ['0.3.0']
+const REJECTED_DSH_VERSIONS = ['0.3.0', '0.3.0-rc.1']
 
 /**
  * Non-dsh peers are pinned by the versions dsh actually depends on:
- * 0.2.0-rc.2 ships ~4.0.4 / ~3.18.4, 0.2.1-rc.2 ships ~4.0.5 / ~3.18.5.
+ * 0.2.0-rc.2 ships ~4.0.4 / ~3.18.4, 0.2.1-rc.2 ships ~4.0.5 / ~3.18.5,
+ * 0.2.2-rc.1 ships ~4.1.0 / ~3.19.0 (caret ranges must keep accepting them).
  */
 const RUNTIME_PEER_VERSIONS = {
-  '@deepseek-ai/cordis': ['4.0.4', '4.0.5'],
-  '@deepseek-ai/schemastery': ['3.18.4', '3.18.5'],
+  '@deepseek-ai/cordis': ['4.0.4', '4.0.5', '4.1.0'],
+  '@deepseek-ai/schemastery': ['3.18.4', '3.18.5', '3.19.0'],
 }
 const RUNTIME_PEER_REJECTED = {
   '@deepseek-ai/cordis': ['5.0.0'],
@@ -224,11 +230,19 @@ test('the minimal matcher reproduces node-semver prerelease rules', () => {
     ['0.2.1-rc.2', '>=0.2.0-rc.2', false],
     ['0.2.1-rc.2', '^0.2.1-rc.2', true],
     ['0.2.1-rc.2', '^0.2.0-rc.2 || ^0.2.1-rc.2', true],
-    // both rc lines, and only those
+    // the premise of #60: the 0.2.2 rc line needs its own comparator
+    ['0.2.2-rc.1', '^0.2.0-rc.2 || ^0.2.1-rc.2', false],
+    ['0.2.2-rc.1', '^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1', true],
+    // all rc lines, and only those
+    ['0.2.0-rc.2', '^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1', true],
+    ['0.2.1-rc.2', '^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1', true],
     ['0.2.0-rc.2', '^0.2.0-rc.2 || ^0.2.1-rc.2', true],
     ['0.2.2', '^0.2.1-rc.2', true],
+    ['0.2.2', '^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1', true],
+    ['0.3.0', '^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1', false],
     ['0.3.0', '^0.2.0-rc.2 || ^0.2.1-rc.2', false],
     ['0.3.0-rc.1', '^0.2.1-rc.2', false],
+    ['0.3.0-rc.1', '^0.2.2-rc.1', false],
     // non-dsh runtime peers
     ['4.0.4', '^4.0.4', true],
     ['4.0.5', '^4.0.4', true],
@@ -251,7 +265,7 @@ test('the matcher rejects syntax it does not implement', () => {
   assert.throws(() => satisfies('1.2', '^1.2.3'), /unsupported/)
 })
 
-test('package.json peers cover both rc lines and reject the next one', async () => {
+test('package.json peers cover every supported rc line and reject the next one', async () => {
   const pkg = JSON.parse(await readFile(join(repoRoot, 'package.json'), 'utf8'))
   const peers = pkg.peerDependencies ?? {}
   assert.ok(Object.keys(peers).length > 0, 'peerDependencies must not be empty')
@@ -269,8 +283,26 @@ test('the guard catches the pre-#47 peer block (regression proof)', () => {
     problems.some((problem) => problem.includes('dsh-tools') && problem.includes('0.2.1-rc.2')),
     `the old range must be flagged as missing the 0.2.1 rc line, got: ${JSON.stringify(problems)}`,
   )
-  assert.deepEqual(peerViolations({ ...before, '@deepseek-ai/dsh-tools': '^0.2.0-rc.2 || ^0.2.1-rc.2' })
+  assert.deepEqual(peerViolations({ ...before, '@deepseek-ai/dsh-tools': '^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1' })
     .filter((problem) => problem.includes('dsh-tools')), [], 'the fixed range must pass')
+})
+
+test('the guard catches a peer block missing the 0.2.2 rc line (regression proof for #60)', () => {
+  const peers = {
+    '@deepseek-ai/cordis': '^4.0.4',
+    '@deepseek-ai/dsh-tools': '^0.2.0-rc.2 || ^0.2.1-rc.2',
+    '@deepseek-ai/schemastery': '^3.18.4',
+  }
+  const problems = peerViolations(peers)
+  assert.ok(
+    problems.some((problem) => problem.includes('dsh-tools') && problem.includes('0.2.2-rc.1')),
+    `the pre-#60 range must be flagged as missing the 0.2.2 rc line, got: ${JSON.stringify(problems)}`,
+  )
+  assert.deepEqual(
+    peerViolations({ ...peers, '@deepseek-ai/dsh-tools': '^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1' }),
+    [],
+    'the fixed range must pass',
+  )
 })
 
 /** Locate the running dsh installation, or undefined when dsh is not installed. */
@@ -322,7 +354,8 @@ test('the minimal matcher agrees with the real node-semver where available', { s
     '1.2.3', '1.2.4-rc.1', '1.3.0', '2.0.0',
   ]
   const ranges = [
-    '^0.2.0-rc.2 || ^0.2.1-rc.2', '^0.2.0-rc.2', '^0.2.1-rc.2', '>=0.2.0-rc.2',
+    '^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1', '^0.2.0-rc.2 || ^0.2.1-rc.2',
+    '^0.2.0-rc.2', '^0.2.1-rc.2', '^0.2.2-rc.1', '>=0.2.0-rc.2',
     '^4.0.4', '~4.0.5', '^3.18.4', '~3.18.4', '^1.2.3', '~1.2.3',
     '=1.2.3', '>1.2.3', '<2.0.0', '>=1.0.0 <2.0.0', '1.2.3 || 2.0.0',
   ]
