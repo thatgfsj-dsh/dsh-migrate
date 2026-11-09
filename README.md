@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/Thatgfsj/dsh-migrate/actions/workflows/ci.yml/badge.svg)](https://github.com/Thatgfsj/dsh-migrate/actions/workflows/ci.yml)
 [![release](https://github.com/Thatgfsj/dsh-migrate/actions/workflows/release.yml/badge.svg)](https://github.com/Thatgfsj/dsh-migrate/actions/workflows/release.yml)
-![DSH](https://img.shields.io/badge/DSH-0.2.0--rc.2-blue)
+![DSH](https://img.shields.io/badge/DSH-0.2.0%20%E2%80%93%200.2.2--rc.1-blue)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20windows%20%7C%20macos-lightgrey)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
