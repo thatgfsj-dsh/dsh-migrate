@@ -84,7 +84,7 @@ Run "pnpm approve" to review them.
 
 ⚠️ **不要**在「添加插件」里填本仓库的 GitHub 地址。本插件没有发布到 npm，git 源安装会让 pnpm 拉远端源码、要求审批它携带的技能（`Agent skills awaiting approval`），并且**会顶掉你原来的本地安装**，之后行为就不再由本机代码决定了。
 
-⚠️ 插件页那一行的**开关是"启用/停用"，不是安装开关**。手滑停用后插件不会加载，页签/工具/技能都会消失；恢复办法是删掉 profile 的 `cordis.patch.yml` 里这两行：
+⚠️ 插件页那一行的**开关是"启用/停用"，不是安装开关**。手滑停用后插件不会加载，页签/工具/技能都会消失；恢复办法是删掉 profile 的 `cordis.patch.yml` 里 `id: dsh-migrate` 的那条覆盖（0.2.2 实测：开关会把它写成单行 `[ { id: dsh-migrate, disabled: true } ]`，重启后仍保留；`cordis.yml` 不会被写）：
 
 ```yaml
 - id: dsh-migrate
@@ -126,7 +126,7 @@ Run "pnpm approve" to review them.
 
 Linux / Windows / macOS 三平台都在 CI 里跑（矩阵 `ubuntu-latest`、`windows-latest`、`macos-latest` × node 24，另加 node 22）。跨平台细节：Windows 长路径与反斜杠、macOS 的 `__MACOSX`/`ditto`、Linux 无 zenity/kdialog 时的兜底，都在代码与用例里覆盖。
 
-支持的 DSH 版本：`0.2.0-rc.2`、`0.2.1-rc.2` 与 `0.2.2-rc.1`（当前 `latest`）。前两条本机真机验证过；`0.2.1-rc.3 … rc.5` 与 `0.2.2-rc.1` 为**静态调查 + CI 自动化实跑**结论——插件契约未变，`ci / compat-next` 已在 0.2.2-rc.1 上跑通（组合层 + 端点）；人工/浏览器验收仍待做。插件的 peer 范围显式覆盖这三条 rc 线（`@deepseek-ai/dsh-tools: ^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1`），CI 的 `compat-next` job 会跟随 `@next` 通道持续复验。
+支持的 DSH 版本：`0.2.0-rc.2`、`0.2.1-rc.2` 与 `0.2.2-rc.1`（当前 `latest`）。前两条本机真机验证过；`0.2.1-rc.3 … rc.5` 与 `0.2.2-rc.1` 为**静态调查 + CI 自动化实跑**结论——插件契约未变，`ci / compat-next` 已在 0.2.2-rc.1 上跑通（组合层 + 端点）；0.2.2 的插件页开关持久化、bundle platforms 准入、退休 bundle 移除已在本机隔离 home 实测（见 [docs/upstream-compat.md](docs/upstream-compat.md)），浏览器内按钮渲染仍待人工。插件的 peer 范围显式覆盖这三条 rc 线（`@deepseek-ai/dsh-tools: ^0.2.0-rc.2 || ^0.2.1-rc.2 || ^0.2.2-rc.1`），CI 的 `compat-next` job 会跟随 `@next` 通道持续复验。
 
 跨版本迁移注意：新机优先装归档 `manifest.json` 里记录的 DSH 版本；装更高版本时注意 Node 要求——`0.2.2+` 需 **Node ≥ 24.9**（来源：`apps/cli/package.json@dsh-v0.2.2-rc.1` 的 `engines.node = ">=24.9.0"`），`0.2.0` / `0.2.1` 用 22.19+ 或 24+（上游这两条线未声明 `engines.node`）。释放报告会按目标 DSH 版本检查目标机 Node，低于下限直接给 warning。调查证据与待验证项见 [docs/upstream-compat.md](docs/upstream-compat.md)。
 
@@ -139,6 +139,7 @@ Linux / Windows / macOS 三平台都在 CI 里跑（矩阵 `ubuntu-latest`、`wi
 | 打包中止且提示发现密钥 | 按报告里的路径/行号清理后重打；不要为了绕过去改判据 |
 | `sha256 不一致` | zip 传输损坏，重新拷贝；`unzip -t` 验证 |
 | 释放后插件不生效 | 报告里会给出 `dsh plugin --profile <p> add <home>/plugins/dsh-migrate`；自举失败不影响释放本身 |
+| 插件页点开关后页签/工具全没了 | 那个开关是**启用/停用**：停用会往 profile 的 `cordis.patch.yml` 写入 `id: dsh-migrate` + `disabled: true`（0.2.2 实测为单行 `[ { id: dsh-migrate, disabled: true } ]`，重启保留；`cordis.yml` 不变） | 删掉该覆盖（或让 agent 删），重启 DSH |
 | 报告里 `skipped` 非空 | 跨平台二进制被跳过，属预期；在新机重装对应插件即可 |
 | 想退回旧环境 | 释放时默认整体备份为 `<home>.bak-<时间>`：删掉新 home，把备份改回原名 |
 | `dsh --profile <p> --help` 挂住不返回 | 该 profile 是 base 模板（`dsh plugin add` 默认建的），base app 的 `--help` 会进 TUI（0.2.0-rc.2 与 0.2.1 实测都挂） | 冒烟改用 web profile：`dsh --profile <p> --from-default-profile web --help`；或外面套 `timeout 60`（macOS 没有 `timeout`，直接跑或用 `gtimeout`） |
