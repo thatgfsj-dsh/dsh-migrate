@@ -14,7 +14,7 @@
 | 归档里少了语音模型 | 模型缓存默认不带 | 重打包时用 `includeModels: true` |
 | 弹不出"选择保存位置" | headless / 无 zenity/kdialog / 无 DISPLAY | 工具会自动回退到默认目录并在报告里说明；也可显式传 `savePath` |
 | 想撤销释放 | 默认会整体备份 | 删掉新 home，把 `<home>.bak-<时间>` 改回 `<home>` |
-| 插件页点开关后页签/工具全没了 | 那个开关是**启用/停用**，停用会往 profile 的 `cordis.patch.yml` 写入 `- id: dsh-migrate / disabled: true` | 把这两行删掉（或让 agent 删），重启 DSH |
+| 插件页点开关后页签/工具全没了 | 那个开关是**启用/停用**，停用会往 profile 的 `cordis.patch.yml` 写入 `id: dsh-migrate` + `disabled: true`（0.2.2 实测为单行 `[ { id: dsh-migrate, disabled: true } ]`，重启保留；`cordis.yml` 不变） | 删掉 `id: dsh-migrate` 那条覆盖（或让 agent 删），重启 DSH |
 | 「添加插件」里填了 GitHub 地址 | 本插件没发 npm，git 安装会拉远端源码、要求审批技能，并**顶掉本地安装** | 卸载后改用本地目录或本地 tgz：`dsh plugin --profile <p> add <路径>` |
 | 安装时提示 `Agent skills awaiting approval` | **pnpm 12 的供应链策略**：解析出的包（registry / git / tgz 归档）里带 agent skills 就要批准；本地目录 `link:` 不解析归档所以不触发（0.2.1 实测） | 插件本体照常可用；在该 profile 目录 `pnpm approve`（或插件页批准）后随包技能才暴露；想免这一步就改用**本地目录**安装 |
 | 体积比预期大很多 | 插件里的媒体资源（例如启动动画视频）本来就大 | 看 manifest `totals.bytesByCategory`，按需取舍；不要改打包器的判据 |
