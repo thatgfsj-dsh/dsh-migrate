@@ -33,6 +33,17 @@ jobs:
         with:
           node-version: '24'
 
+      # Windows only: paths longer than 260 characters (#18) need LongPathsEnabled
+      # in the registry; GitHub-hosted runners do not enable it by default. The
+      # long-path test itself is capability-gated, so a host that still refuses the
+      # fixture reports a skip instead of a false failure.
+      - name: Enable Windows long paths (>260)
+        if: matrix.name == 'windows'
+        shell: pwsh
+        run: |
+          New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' `
+            -Name 'LongPathsEnabled' -Value 1 -PropertyType DWORD -Force | Out-Null
+
       - name: Unit tests
         run: node --test "test/**/*.test.mjs"
 

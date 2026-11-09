@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { after, before, test } from 'node:test'
@@ -29,6 +29,10 @@ async function buildHome(name) {
   await put('skills/demo/SKILL.md', '---\nname: demo\ndescription: d\n---\nbody\n')
   await put('plugins/dsh-demo/entry.js', 'export function apply() {}\n')
   await put('plugins/dsh-demo/runtime/linux-x64/worker', Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00]))
+  // #18/#19: CJK payload names and a POSIX executable must survive pack + release.
+  await put('plugins/dsh-demo/resources/说明 文件.txt', '中文载荷\n')
+  await put('plugins/dsh-demo/bin/helper.sh', '#!/bin/sh\necho helper\n')
+  if (process.platform !== 'win32') await chmod(join(home, 'plugins/dsh-demo/bin/helper.sh'), 0o755)
   await put('profiles/web/package.json', JSON.stringify({
     name: 'dsh-profile-web',
     dependencies: { 'dsh-ops': `file:${home}/artifacts/dsh-ops-0.3.1-linux-x64.tgz` },
@@ -52,7 +56,7 @@ test('release: end-to-end into a fresh home, with rewrite and zero residuals', a
   const source = await buildHome('src-fresh')
   const zipPath = join(root, 'fresh.zip')
   await pack({ home: source, outPath: zipPath })
-  const targetHome = join(root, 'target-fresh')
+  const targetHome = join(root, 'target-fresh-中文')
 
   const plan = await release({ zipPath, targetHome, dryRun: true })
   assert.equal(plan.ok, true)
@@ -69,6 +73,14 @@ test('release: end-to-end into a fresh home, with rewrite and zero residuals', a
   assert.equal(await sha256File(join(targetHome, 'AGENTS.md')), await sha256File(join(source, 'AGENTS.md')))
   assert.equal(await sha256File(join(targetHome, 'plugins/dsh-demo/entry.js')), await sha256File(join(source, 'plugins/dsh-demo/entry.js')))
   assert.equal(await sha256File(join(targetHome, 'storages/workspace.json')), await sha256File(join(source, 'storages/workspace.json')))
+
+  // #18/#19: CJK payload names and the executable bit survive the whole pipeline.
+  assert.equal(await readFile(join(targetHome, 'plugins/dsh-demo/resources/说明 文件.txt'), 'utf8'), '中文载荷\n')
+  if (process.platform !== 'win32') {
+    assert.ok(((await stat(join(targetHome, 'plugins/dsh-demo/bin/helper.sh'))).mode & 0o111) !== 0, 'the executable bit must survive release')
+    const helperEntry = result.manifest.entries.find((entry) => entry.path === 'plugins/dsh-demo/bin/helper.sh')
+    assert.ok((helperEntry.mode & 0o111) !== 0, 'the manifest records the executable mode for Windows targets')
+  }
 
   // absolute dependencies were pointed at the new home
   const pkg = JSON.parse(await readFile(join(targetHome, 'profiles/web/package.json'), 'utf8'))

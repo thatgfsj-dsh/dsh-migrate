@@ -27,6 +27,7 @@ test('toPosixPath / normalizePrefix', () => {
   assert.equal(toPosixPath(String.raw`C:\Users\old\.dsh`), 'C:/Users/old/.dsh')
   assert.equal(normalizePrefix('/home/old/.dsh/'), '/home/old/.dsh')
   assert.equal(normalizePrefix(String.raw`C:\Users\old\.dsh\\`), 'C:/Users/old/.dsh')
+  assert.equal(normalizePrefix('C:\\Users\\old\\.dsh\\'), 'C:/Users/old/.dsh', 'a trailing backslash must not break the prefix')
 })
 
 test('buildRewriteRules: longest first, deduped, no-ops dropped', () => {
@@ -106,4 +107,46 @@ test('binary payloads are never rewritten', async () => {
   const result = await applyRewritePlan(tree, rules, { extensions: new Set(['.bin']) })
   assert.equal(result.files.length, 0)
   assert.ok((await readFile(path)).includes(Buffer.from('/home/old/.dsh/plugins')))
+})
+
+test('drive-letter rules rewrite forward, backslash and JSON-escaped spellings (#18)', () => {
+  const rules = buildRewriteRules({ from: String.raw`C:\Users\old\.dsh`, to: String.raw`D:\Data\new\.dsh` })
+  assert.equal(rules.length, 1)
+  assert.equal(rules[0].from, 'C:/Users/old/.dsh', 'rules are normalized to POSIX separators')
+
+  const yaml = rewriteText(String.raw`root: C:\Users\old\.dsh\plugins`, rules)
+  assert.equal(yaml.text, String.raw`root: D:\Data\new\.dsh\plugins`)
+
+  const forward = rewriteText('"file:C:/Users/old/.dsh/artifacts/dsh-ops.tgz"', rules)
+  assert.equal(forward.text, '"file:D:/Data/new/.dsh/artifacts/dsh-ops.tgz"')
+
+  const escaped = rewriteText(String.raw`{"p":"C:\\Users\\old\\.dsh\\plugins"}`, rules)
+  assert.equal(escaped.text, String.raw`{"p":"D:\\Data\\new\\.dsh\\plugins"}`)
+  assert.equal(escaped.hits, 1)
+})
+
+test('applyRewritePlan rewrites a Windows-spelled home inside a tree, then residuals are clean (#18)', async () => {
+  const tree = join(root, 'drive-tree')
+  await put('drive-tree/profiles/web/package.json', JSON.stringify({
+    name: 'dsh-profile-web',
+    dependencies: { 'dsh-ops': String.raw`file:C:\Users\old\.dsh\artifacts\dsh-ops.tgz` },
+  }, null, 2))
+  await put('drive-tree/config/paths.yml', String.raw`plugins: C:\Users\old\.dsh\plugins` + '\n')
+  await put('drive-tree/config/posix.yml', 'plugins: C:/Users/old/.dsh/plugins\n')
+
+  const rules = buildRewriteRules({ from: String.raw`C:\Users\old\.dsh`, to: String.raw`D:\Data\new\.dsh` })
+  const needles = [String.raw`C:\Users\old\.dsh`, 'C:/Users/old/.dsh', String.raw`C:\\Users\\old\\.dsh`]
+  const before = await findResiduals(tree, needles)
+  assert.equal(before.length, 3, JSON.stringify(before))
+
+  const result = await applyRewritePlan(tree, rules)
+  assert.equal(result.files.length, 3)
+
+  const pkg = JSON.parse(await readFile(join(tree, 'profiles/web/package.json'), 'utf8'))
+  assert.equal(pkg.dependencies['dsh-ops'], String.raw`file:D:\Data\new\.dsh\artifacts\dsh-ops.tgz`)
+  assert.equal((await readFile(join(tree, 'config/paths.yml'), 'utf8')).trim(), String.raw`plugins: D:\Data\new\.dsh\plugins`)
+  assert.equal((await readFile(join(tree, 'config/posix.yml'), 'utf8')).trim(), 'plugins: D:/Data/new/.dsh/plugins')
+
+  // The release residual scan is a plain substring search: pass both spellings.
+  assert.deepEqual(await findResiduals(tree, needles), [])
 })

@@ -52,3 +52,12 @@ test('the compat-next channel job survives the trigger change', async () => {
   assert.match(workflow, /^ {2}compat-next:$/m, 'compat-next must remain a top-level job')
   assert.match(workflow, /bash scripts\/compat-check\.sh/, 'compat-next must keep using the shared script')
 })
+
+test('the platform matrix keeps all three OSes and enables Windows long paths (#18)', async () => {
+  const workflow = await readFile(join(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8')
+  for (const os of ['ubuntu-latest', 'windows-latest', 'macos-latest']) {
+    assert.ok(workflow.includes(os), `the matrix must keep ${os}`)
+  }
+  assert.match(workflow, /if: matrix\.name == 'windows'/, 'the Windows job must gate the long-path step')
+  assert.match(workflow, /LongPathsEnabled/, 'the Windows job must enable >260 character paths')
+})
